@@ -1,0 +1,4 @@
+Heimdall URL https://{{ .Values.ingress.heimdall_host }}
+Defect-dojo URL https://{{ .Values.ingress.defect_dojo_host }}
+Dependency-track URL https://{{ .Values.ingress.dependency_track_host }}
+Rundeck URL https://{{ .Values.ingress.rundeck_host }}

@@ -1,0 +1,18 @@
+{{- if .Values.istio.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.ingress.secret }}
+  namespace: istio-system
+spec:
+  secretName: {{ .Values.ingress.secret }}
+  dnsNames:
+  - {{ .Values.ingress.defect_dojo_host }}
+  - {{ .Values.ingress.dependency_track_host }}
+  - {{ .Values.ingress.heimdall_host }}
+  - {{ .Values.ingress.rundeck_host }}
+  - {{ .Values.ingress.terraboard_host }}
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer    
+{{- end }}

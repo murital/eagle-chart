@@ -1,0 +1,145 @@
+# Default values for eagle.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+
+ingress:
+  enabled: true
+  class: nginx-internal
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/tls-acme: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  defect_dojo_host: dojo.softrams.cloud
+  dependency_track_host: dtrack.softrams.cloud
+  heimdall_host: heimdall.softrams.cloud
+  rundeck_host: rundeck.softrams.cloud
+  terraboard_host: terraboard.softrams.cloud
+  secret: eagle-tls
+  gateway: eagle
+
+# env secret settings
+dojo_secret_key: ""
+db_user: postgres
+db_password: postgres
+db_host: db
+rundeck_worker_password: rundeck
+dojo_aes_key: ""
+
+
+
+AWS_REGION: us-east-1
+
+
+# nfs server to mount on pods
+nfs_server: ""
+nfs_path: /
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+rundeck:
+
+  resources: {}
+  #  limits:
+  #    cpu: 1024m
+  #    memory: 4Gi
+  #  requests:
+  #    cpu: 1024m
+  #    memory: 4Gi
+
+heimdall:
+
+  jwtSecret: 27bcd20c177a0588d8a126a71ca45f1244a7e4d98860c507ca5f7af311bc1129294115df802c753e61e2f7c91edef553d8f5591eab2112608ff93df996c9af1a24ae1c549ad6fb8b32ac8e9a9a99d511c04c752d1092b64c65817727620e52a178a15961885eb4e180fff3f0b7f271c018f721d4499ef15e309e020268f23ab6
+  apiKey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlJZCI6IjEiLCJjcmVhdGVkQXQiOiIyMDIxLTEwLTExVDIzOjU1OjQyLjMyM1oiLCJpYXQiOjE2MzM5OTY1NDJ9.kr8Kt_9E5mV2dqf_vhypOJlUTVYKshLrQSAdohuJ9UA
+  image: mitre/heimdall2
+  tag: "2.5.3"
+  resources: {}
+  #  limits:
+  #    cpu: 1024m
+  #    memory: 4Gi
+  #  requests:
+  #    cpu: 1024m
+  #    memory: 4Gi
+  extraEnvs: []
+  # extraEnvs:
+  #   - name: GITHUB_CLIENTID
+  #     valueFrom:
+  #       secretKeyRef:
+  #         key: GITHUB_CLIENTID
+  #         name: heimdall-secret
+  secrets: []
+  # secrets:
+  #   key: value
+
+
+dojo:
+
+  resources: {}
+  #  limits:
+  #    cpu: 1024m
+  #    memory: 4Gi
+  #  requests:
+  #    cpu: 1024m
+  #    memory: 4Gi
+  extraEnvs: []
+  # extraEnvs:
+  #   - name: GITHUB_CLIENTID
+  #     valueFrom:
+  #       secretKeyRef:
+  #         key: GITHUB_CLIENTID
+  #         name: heimdall-secret
+  secrets: []
+  # secrets:
+  #   key: value
+
+dtrack:
+  resources: {}
+  #  limits:
+  #    cpu: 2048m
+  #    memory: 6Gi
+  #  requests:
+  #    cpu: 2048m
+  #    memory: 6Gi
+
+
+istio:
+   enabled: false
+
+
+
+terraboard:
+  enabled: false
+  resources: {}
+
+

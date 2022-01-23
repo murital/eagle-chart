@@ -1,0 +1,355 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: defect-dojo        
+  labels:
+    app: defect-dojo   
+    {{- include "eagle.labels" . | nindent 4 }}
+spec:
+  replicas: 1          
+  selector:
+    matchLabels:
+      app: defect-dojo
+  strategy:
+    rollingUpdate:
+      maxSurge: 0       
+      maxUnavailable: 1 
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: defect-dojo
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "eagle.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      - image: 430405884063.dkr.ecr.us-east-1.amazonaws.com/defectdojo-django
+        name: initializer
+        imagePullPolicy: Always
+        command: ["/wait-for-it.sh"]
+        args: [
+        "$(DATABASE_HOST):5432",
+        "--",
+        "/entrypoint-initializer.sh"
+        ]
+        env:
+        - name: DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: db_host
+        - name: DATABASE_NAME
+          value: "defect-dojo" 
+        - name: DB_TYPE
+          value: "PostgreSQL"
+        - name: DD_ADMIN_FIRST_NAME
+          value: "Admin"
+        - name: DD_ADMIN_LAST_NAME
+          value: "User"
+        - name: DD_ADMIN_MAIL
+          value: "admin@defectdojo.local"
+        - name: DD_ADMIN_USER
+          value: "admin"
+        - name: DD_CREDENTIAL_AES_256_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_aes_key
+        - name: DD_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_db
+        - name: DD_INITIALIZE
+          value: "true"
+        - name: DD_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_secret_key  
+      containers:
+      - image: 430405884063.dkr.ecr.us-east-1.amazonaws.com/defectdojo-nginx
+        name: nginx
+        imagePullPolicy: Always
+        resources:
+{{ toYaml .Values.dojo.resources | indent 10 }}
+        env:
+        - name: DD_UWSGI_HOST
+          value: "localhost"
+        - name: NGINX_METRICS_ENABLED
+          value: "False" 
+         {{- if .Values.dojo.extraEnvs }}
+        {{ toYaml .Values.dojo.extraEnvs | indent 8 }}
+        {{- end }}
+        ports:             
+         - containerPort: 8080
+           name: http
+           protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          failureThreshold: 6
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          failureThreshold: 3
+          periodSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /
+            port: http
+          failureThreshold: 180
+          periodSeconds: 10
+      - image: 430405884063.dkr.ecr.us-east-1.amazonaws.com/defectdojo-django
+        name: uwsgi
+        imagePullPolicy: Always
+        command: ["/wait-for-it.sh"]
+        args: [
+        "$(DATABASE_HOST):5432",
+        "-t",
+        "30",
+        "--",
+        "/entrypoint-uwsgi.sh"
+        ]
+        env:
+        - name: DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: db_host
+        - name: DATABASE_NAME
+          value: "defect-dojo" 
+        - name: DB_TYPE
+          value: "PostgreSQL"
+        - name: DD_ALLOWED_HOSTS
+          value: "*"
+        - name: DD_CELERY_BROKER_PASSWORD
+          value: "guest"
+        - name: DD_CELERY_BROKER_USER
+          value: "guest"
+        - name: DD_CREDENTIAL_AES_256_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_aes_key
+        - name: DD_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_db
+        - name: DD_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_secret_key
+        - name: DD_DEBUG
+          value: "False"
+        - name: DD_SESSION_COOKIE_SECURE
+          value: "True"
+        - name: DD_CSRF_COOKIE_SECURE
+          value: "True"
+        ports:             
+         - containerPort: 3031
+           name: http
+           protocol: TCP
+      - image: 430405884063.dkr.ecr.us-east-1.amazonaws.com/defectdojo-django
+        name: celerybeat
+        imagePullPolicy: Always
+        securityContext:
+          runAsUser: 0
+        command: ["/wait-for-it.sh"]
+        args: [
+        "$(DATABASE_HOST):5432",
+        "-t",
+        "30",
+        "--",
+        "/entrypoint-celery-beat.sh"
+        ]
+        env:
+        - name: DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: db_host
+        - name: DD_CELERY_BROKER_HOST
+          value: "localhost" 
+        - name: DB_TYPE
+          value: "PostgreSQL"
+        - name: DD_CELERY_BROKER_PASSWORD
+          value: "guest"
+        - name: DD_CELERY_BROKER_USER
+          value: "guest"
+        - name: DD_CREDENTIAL_AES_256_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_aes_key
+        - name: DD_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_db
+        - name: DD_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_secret_key
+      - image: 430405884063.dkr.ecr.us-east-1.amazonaws.com/defectdojo-django
+        name: celeryworker
+        imagePullPolicy: Always
+        command: ["/wait-for-it.sh"]
+        args: [
+        "$(DATABASE_HOST):5432",
+        "-t",
+        "30",
+        "--",
+        "/entrypoint-celery-worker.sh"
+        ]
+        env:
+        - name: DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: db_host
+        - name: DD_CELERY_BROKER_HOST
+          value: "localhost"
+        - name: DD_CELERY_WORKER_POOL_TYPE
+          value: "prefork"
+        - name: DD_CELERY_WORKER_AUTOSCALE_MIN
+          value: "2"
+        - name: DD_CELERY_WORKER_AUTOSCALE_MAX
+          value: "8"
+        - name: DD_CELERY_WORKER_CONCURRENCY
+          value: "8"
+        - name: DD_CELERY_WORKER_PREFETCH_MULTIPLIER
+          value: "128"
+        - name: DB_TYPE
+          value: "PostgreSQL"
+        - name: DD_CELERY_BROKER_PASSWORD
+          value: "guest"
+        - name: DD_CELERY_BROKER_USER
+          value: "guest"
+        - name: DD_CREDENTIAL_AES_256_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_aes_key
+        - name: DD_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_db
+        - name: DD_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: dojo_secret_key
+      - image: rabbitmq:3.7.26
+        name: rabbitmq
+        imagePullPolicy: Always
+        ports:             
+         - containerPort: 5672
+           name: http
+           protocol: TCP
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: defect-dojo
+  labels:
+    {{- include "eagle.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: defect-dojo
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+---
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: defect-dojo
+  labels:
+    {{- include "eagle.labels" . | nindent 4 }}
+spec:
+  hosts:
+  - {{ .Values.ingress.defect_dojo_host }}
+  gateways:
+  - {{ .Values.ingress.gateway }}
+  http:
+  - route:
+    - destination:
+        port:
+          number: 8080
+        host: defect-dojo
+{{- end }}
+
+---
+
+
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: defect-dojo
+  labels:
+    {{- include "eagle.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  spec:
+  ingressClassName: {{ .Values.ingress.class }}
+  tls:
+    - hosts:
+      - {{ .Values.ingress.defect_dojo_host }}
+  rules:
+  - host: 
+    - {{ .Values.ingress.defect_dojo_host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: defect-dojo
+            port:
+              number: 8080
+{{- end }}
+
+---
+
+{{- if .Values.dojo.secrets }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dojo-secret
+  labels:
+    {{- include "eagle.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+{{ toYaml .Values.dojo.secrets | indent 2 }}
+{{- end }}

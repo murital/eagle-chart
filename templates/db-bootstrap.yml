@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-bootstrap
+data:
+  init.sh: |
+    #!/bin/sh
+    for DB in defectdojo dtrack heimdall rundeck terraboard 
+    do
+      psql -U postgres -c 'select 1' -d $DB &>dev/null && echo "$DB already exists" || psql -U postgres -tc "create database $DB"
+    done
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-bootstrap
+  labels:
+    {{- include "eagle.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "eagle.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes:
+        - name: init
+          configMap:
+            name: db-bootstrap
+            defaultMode: 0755
+      containers:
+      - name: db-bootstrap
+        image: postgres:alpine3.14
+        command: ["sh"]
+        args: ["init/init.sh"]
+        env:
+        - name: PGHOST
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: db_host
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: db_password
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: eagle-env
+              key: db_user
+        volumeMounts:
+        - name: init
+          mountPath: /init
+      restartPolicy: Never
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

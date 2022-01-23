@@ -1,0 +1,26 @@
+
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: eagle
+  labels:
+    {{- include "eagle.labels" . | nindent 4 }}
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: {{ .Values.ingress.secret }}
+    hosts:
+    - {{ .Values.ingress.defect_dojo_host }}
+    - {{ .Values.ingress.dependency_track_host }}
+    - {{ .Values.ingress.heimdall_host }}
+    - {{ .Values.ingress.rundeck_host }}
+    - {{ .Values.ingress.terraboard_host }}
+{{- end }}
